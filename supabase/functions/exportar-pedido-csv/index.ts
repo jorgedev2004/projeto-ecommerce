@@ -8,31 +8,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
-
     const url = new URL(req.url)
     const pedidoId = url.searchParams.get('pedido_id')
-
-    if (!pedidoId) {
-      throw new Error("ID do pedido não fornecido.")
-    }
-
+    if (!pedidoId) throw new Error("O ID do pedido é obrigatório.")
     const { data: itens, error } = await supabaseClient
       .from('pedido_itens')
-      .select(`
-        quantidade,
-        preco_unitario,
-        produtos ( nome, descricao )
-      `)
+      .select(`quantidade, preco_unitario, produtos ( nome, descricao )`)
       .eq('pedido_id', pedidoId)
-
     if (error) throw error
-
+    if (!itens || itens.length === 0) return new Response("Nenhum item encontrado para este pedido.", { status: 404 });
     let csv = 'Produto,Quantidade,Preco Unitario,Subtotal\n';
     itens.forEach(item => {
       const subtotal = item.quantidade * item.preco_unitario;
-      csv += `${item.produtos.nome},${item.quantidade},${item.preco_unitario},${subtotal}\n`;
+      csv += `"${item.produtos.nome}",${item.quantidade},${item.preco_unitario},${subtotal}\n`;
     });
-
     return new Response(csv, {
       headers: {
         "Content-Type": "text/csv",
